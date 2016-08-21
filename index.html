@@ -1,0 +1,164 @@
+<html>
+<head>
+	<title>Optimizacion Operadores Portuarios</title>
+	<script type="text/javascript" language="javascript" src="script/DataTables/media/js/jquery.js"></script>
+	<script type="text/javascript" language="javascript" src="script/DataTables/media/js/jquery.dataTables.js"></script>
+	<script src="script/HighCharts/js/highcharts.js"></script>
+	<script src="script/HighCharts/js/modules/exporting.js"></script>
+	<link rel="stylesheet" type="text/css" href="script/DataTables/media/css/jquery.dataTables.css">
+</head>
+<body>
+	<div id="demo"></div>
+	<div style="margin-top:20px;">
+		<div style="border:1px solid #000;cursor:pointer;width:43px;" onclick="borrar();">Borrar</div>
+		<div style="border:1px solid #000;cursor:pointer;width:43px;" onclick="calcular();">Calcular</div>
+	</div>
+	<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+</body>
+</html>
+
+<script type="text/javascript">
+var gruas = ["G1","G2","G3","G4","G5","G6","G7","G8","G11","G12"];
+var prods = [15,20,30,35,35,35,35,35,40,40];
+var hora_ini = 8;
+var hora_fin = 18;
+
+var movsRTG = 11;
+var maxRTG = 20;
+var costo_hora = 20;
+var costo_inicio = 10;
+var costo_fin = 10;
+
+var INF = 1000000000000;
+var T = Array();
+	
+var dataSet = Array();
+var columnas = Array();
+var dataMar = Array();
+var movsMar = Array();
+var horas = Array();
+
+columnas[0] = {"title":"Hora"};
+for(var i=0;i<gruas.length;i++)
+	columnas[i+1] = {"title":gruas[i], "className":"dt-body-center"};
+columnas[gruas.length+1] = {"title":"Movimientos", "className":"dt-body-center"};
+
+for(var i=0; i<hora_fin-hora_ini; i++) {
+	horas[i] = (hora_ini+i)+":00 - "+(hora_ini+i+1)+":00";
+	dataMar[i] = 0;
+	dataSet[i] = Array();
+	dataSet[i][0] = horas[i];
+	for(var j=0;j<gruas.length;j++)
+		dataSet[i][j+1] = "<input type='text' style='width:30px;' id='gr_"+i+"_"+j+"' onchange='calcMov();'>";
+	dataSet[i][gruas.length+1] = "<div id='mov_"+i+"'>0</div>";
+}
+ 
+$(document).ready(function() {
+    $('#demo').html( '<table cellpadding="0" cellspacing="0" border="0" class="display" id="example"></table>' );
+ 
+    $('#example').dataTable( {
+        "data": dataSet,
+        "paging":   false,
+        "ordering": false,
+        "info":     false,
+		"searching": false,
+        "columns": columnas
+    } ); 
+
+	$('#container').highcharts({
+        chart: {
+            type: 'column'
+        },
+        title: {
+            text: 'Movimientos'
+        },
+        xAxis: {
+            categories: horas
+        },
+        yAxis: {
+            min: 0,
+            title: {
+                text: 'Numero de movimientos'
+            }
+        },
+        tooltip: {
+            formatter: function () {
+                return '<b>' + this.x + '</b><br/>' +
+                    this.series.name + ': ' + this.y + '<br/>' +
+                    'Total: ' + this.point.stackTotal;
+            }
+        },
+        plotOptions: {
+            column: {
+                stacking: 'normal'
+            }
+        },
+        series: [{
+            name: 'Maritimos',
+            data: dataMar
+        }]
+    });
+	
+	calcMov();
+	
+} );
+	
+function borrar(){
+	for(var i=0;i<hora_fin-hora_ini;i++)
+		for(var j=0;j<gruas.length;j++)
+			$('#gr_'+i+"_"+j).val("");
+	calcMov();
+}
+	
+function calcMov(){
+	for(var i=0;i<hora_fin-hora_ini;i++) {
+		var total = 0;
+		for(var j=0;j<gruas.length;j++) {
+			valor = parseFloat($('#gr_'+i+"_"+j).val()!=""?$('#gr_'+i+"_"+j).val():0);
+			total+=valor*prods[j];
+		}
+		$("#mov_"+i).text(total);
+		dataMar[i] = movsMar[i] = total;
+	}
+	refrescarGraf();
+}
+	
+function refrescarGraf(){
+	var chart = $('#container').highcharts();
+	chart.series[0].setData(dataMar);
+}
+	
+function calcular(){
+
+	var mp = 0;
+
+	for(var i=0;i<(hora_fin-hora_ini+1);i++) {
+		T[i] = Array();
+		for(var j=0;j<maxRTG;j++) {
+			T[i][j] = Array();
+			for(var k=0;k<=mp;k++) {
+				T[i][j][k] = -1;
+			}
+		}
+	}
+	res = progDin(0,0,mp);
+	
+}
+
+function progDin(hora, operadores, movspendientes){
+	if(T[hora][operadores][movspendientes]!=-1) return T[hora][operadores][movspendientes];
+	if(hora>=hora_fin-hora_ini) {return T[hora][operadores][movspendientes] = costo_fin*operadores + movspendientes*INF;}
+	var costo = INF;
+	for(var i=0;i<maxRTG;i++) {
+		var nuevos = Math.max(0,i - operadores);
+		var sacar = Math.max(0, operadores - i);
+		if(i*movsRTG>=movsMar[hora]) {
+			recur = progDin(hora+1,i,Math.max(movspendientes-(i*movsRTG-movsMar[hora]),0));
+			costo = Math.min(costo, recur + i*costo_hora + nuevos*costo_inicio + sacar*costo_fin );
+		}
+	}
+	return T[hora][operadores][movspendientes] = costo;
+}
+
+
+</script>
